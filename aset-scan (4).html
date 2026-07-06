@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AsetScan — Audit &amp; Semakan Aset</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1b1d19;
+    --surface:#232620;
+    --surface2:#2c2f27;
+    --line:#3a3d33;
+    --accent:#e8722c;
+    --accent2:#f2c14e;
+    --text:#f3f1e7;
+    --muted:#8b8d7e;
+    --success:#6baa75;
+    --danger:#d65c4b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--text); font-family:'Barlow Condensed', sans-serif; min-height:100vh;}
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  .hazard{
+    height:6px;
+    background: repeating-linear-gradient(135deg, var(--accent2) 0 10px, var(--bg) 10px 20px);
+    opacity:0.9;
+  }
+
+  header{ padding:22px 18px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .logo{ display:flex; align-items:center; gap:10px; }
+  .logo .bars{ display:flex; gap:2px; height:26px; align-items:flex-end; }
+  .logo .bars span{ display:block; width:3px; background:var(--accent2); }
+  .logo .bars span:nth-child(1){height:26px;}
+  .logo .bars span:nth-child(2){height:14px;}
+  .logo .bars span:nth-child(3){height:22px;}
+  .logo .bars span:nth-child(4){height:9px;}
+  .logo .bars span:nth-child(5){height:26px;}
+  .logo h1{ font-size:26px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; }
+  .logo .sub{ display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1.5px; margin-top:-2px; }
+  .status-pill{
+    font-family:'IBM Plex Mono', monospace; font-size:11px;
+    background:var(--surface2); border:1px solid var(--line); color:var(--muted);
+    padding:5px 10px; border-radius:3px;
+  }
+  .status-pill.ok{ color:var(--success); border-color:var(--success); }
+
+  main{ max-width:520px; margin:0 auto; padding:0 16px 40px; }
+
+  .panel{ background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:16px; margin-top:16px; }
+  .panel-label{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:2px; color:var(--accent);
+    text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:8px;
+  }
+  .panel-label::after{ content:''; flex:1; height:1px; background:var(--line); }
+
+  #video-wrap{
+    position:relative; width:100%; aspect-ratio:4/3; background:#000;
+    border-radius:4px; overflow:hidden; border:1px solid var(--line);
+  }
+  #video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .scan-frame{
+    position:absolute; inset:18%; border:2px solid var(--accent2); border-radius:4px;
+    box-shadow:0 0 0 999px rgba(0,0,0,0.35); pointer-events:none;
+  }
+  .scan-line{
+    position:absolute; left:18%; right:18%; top:18%; height:2px; background:var(--accent);
+    animation: sweep 1.8s ease-in-out infinite; box-shadow:0 0 8px var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce){ .scan-line{ animation:none; } }
+  @keyframes sweep{ 0%{ top:18%; } 50%{ top:78%; } 100%{ top:18%; } }
+  #cam-status{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--muted); text-align:center; padding:30px 10px; }
+  .cam-debug{ font-size:11px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .cam-debug.warn{ color:var(--accent2); }
+  .cam-debug.err{ color:var(--danger); }
+
+  .btn{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:16px; letter-spacing:0.5px;
+    text-transform:uppercase; border:none; border-radius:4px; padding:12px 16px; cursor:pointer;
+    transition:transform 0.08s ease, filter 0.15s ease;
+  }
+  .btn:active{ transform:scale(0.97); }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-primary{ background:var(--accent); color:#1b1d19; }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:transparent; color:var(--text); border:1px solid var(--line); }
+  .btn-ghost:hover{ border-color:var(--accent); }
+  .btn-row{ display:flex; gap:10px; margin-top:12px; }
+  .btn-row .btn{ flex:1; }
+
+  .manual-row{ display:flex; gap:8px; margin-top:14px; }
+  input[type=text], textarea{
+    font-family:'IBM Plex Mono', monospace; background:var(--surface2); border:1px solid var(--line);
+    color:var(--text); padding:10px 12px; border-radius:4px; font-size:14px; width:100%;
+  }
+  textarea{ font-family:'Barlow Condensed', sans-serif; font-size:15px; resize:vertical; min-height:70px; }
+  input:focus, textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  label{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--muted);
+    letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;
+  }
+  .field{ margin-top:14px; }
+
+  #info-panel{ display:none; }
+  .info-row{ display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .info-row:last-child{ border-bottom:none; }
+  .info-row .k{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  .info-row .v{ font-size:17px; font-weight:600; text-align:right; }
+  .not-found{
+    color:var(--danger); font-family:'IBM Plex Mono', monospace; font-size:13px;
+    padding:10px; background:rgba(214,92,75,0.1); border:1px solid var(--danger); border-radius:4px;
+  }
+
+  .status-toggle{ display:flex; gap:10px; margin-top:8px; }
+  .status-toggle button{
+    flex:1; padding:14px; border-radius:4px; border:1px solid var(--line);
+    background:var(--surface2); color:var(--muted); font-family:'Barlow Condensed', sans-serif;
+    font-weight:700; font-size:16px; letter-spacing:0.5px; text-transform:uppercase; cursor:pointer;
+  }
+  .status-toggle button.sel-baik{ background:rgba(107,170,117,0.15); border-color:var(--success); color:var(--success); }
+  .status-toggle button.sel-rosak{ background:rgba(214,92,75,0.15); border-color:var(--danger); color:var(--danger); }
+
+  #audit-panel{ display:none; }
+
+  .log-item{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .log-item:last-child{ border-bottom:none; }
+  .log-badge{
+    font-family:'IBM Plex Mono', monospace; font-size:10px; font-weight:600; padding:4px 8px;
+    border-radius:3px; text-transform:uppercase; flex-shrink:0;
+  }
+  .log-badge.baik{ background:rgba(107,170,117,0.15); color:var(--success); }
+  .log-badge.rosak{ background:rgba(214,92,75,0.15); color:var(--danger); }
+  .log-info{ flex:1; min-width:0; }
+  .log-name{ font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .log-meta{ font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--muted); margin-top:2px; }
+  .empty-state{ text-align:center; padding:30px 20px; color:var(--muted); }
+  .empty-state .mono{ font-size:12px; letter-spacing:1px; }
+  .empty-state p{ font-size:16px; margin-top:8px; }
+
+  footer{ text-align:center; padding:20px; color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:1px; }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(80px);
+    background:var(--surface2); border:1px solid var(--accent); color:var(--text);
+    padding:10px 18px; border-radius:4px; font-family:'IBM Plex Mono', monospace; font-size:12px;
+    transition:transform 0.25s ease; z-index:50; max-width:90%; text-align:center;
+  }
+  .toast.show{ transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="bars"><span></span><span></span><span></span><span></span><span></span></div>
+    <div>
+      <h1>AsetScan</h1>
+      <span class="sub">AUDIT &amp; SEMAKAN ASET</span>
+    </div>
+  </div>
+  <div class="status-pill" id="conn-pill">Belum sambung</div>
+</header>
+<div class="hazard"></div>
+
+<main>
+
+  <div class="panel">
+    <div class="panel-label">Sambungan Google Sheet</div>
+    <div class="manual-row">
+      <input type="text" id="webhook-url" placeholder="Paste Apps Script Web App URL">
+      <button class="btn btn-ghost" id="webhook-save">Save</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Scan Barkod</div>
+    <div id="video-wrap">
+      <video id="video" playsinline muted></video>
+      <div class="scan-frame" id="scan-frame" style="display:none;"></div>
+      <div class="scan-line" id="scan-line" style="display:none;"></div>
+      <div id="cam-status">Sambungkan Google Sheet dahulu, kemudian tekan "Mula kamera".</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="cam-toggle">Mula kamera</button>
+    </div>
+    <div class="cam-debug mono" id="cam-debug"></div>
+    <div class="manual-row">
+      <input type="text" id="manual-input" placeholder="Atau taip barkod manual">
+      <button class="btn btn-ghost" id="manual-lookup">Cari</button>
+    </div>
+  </div>
+
+  <div class="panel" id="info-panel">
+    <div class="panel-label">Maklumat Aset</div>
+    <div id="info-body"></div>
+  </div>
+
+  <div class="panel" id="audit-panel">
+    <div class="panel-label">Semakan</div>
+    <label>Status Semakan</label>
+    <div class="status-toggle">
+      <button type="button" id="status-baik">BAIK</button>
+      <button type="button" id="status-rosak">ROSAK</button>
+    </div>
+    <div class="field">
+      <label>Lokasi Semakan</label>
+      <input type="text" id="lokasi-semakan" list="lokasi-list" placeholder="Taip untuk cari lokasi...">
+      <datalist id="lokasi-list"></datalist>
+    </div>
+    <div class="field">
+      <label>Catatan</label>
+      <textarea id="catatan" placeholder="Catatan tambahan (jika ada)"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="submit-audit">Hantar Semakan</button>
+      <button class="btn btn-ghost" id="cancel-audit">Batal</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Semakan Terkini (sesi ini)</div>
+    <div id="log-list"><div class="empty-state"><div class="mono">TIADA REKOD LAGI</div><p>Semakan yang dihantar akan disenaraikan di sini.</p></div></div>
+  </div>
+
+</main>
+
+<footer>ASETSCAN · SEMAKAN DIHANTAR TERUS KE AUDIT_ASET</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+let stream = null;
+let detector = null;
+let scanInterval = null;
+let webhookUrl = '';
+let currentAsset = null;
+let selectedStatus = null;
+let sessionLog = [];
+
+const video = document.getElementById('video');
+const camToggle = document.getElementById('cam-toggle');
+const camStatus = document.getElementById('cam-status');
+const scanFrame = document.getElementById('scan-frame');
+const scanLine = document.getElementById('scan-line');
+const manualInput = document.getElementById('manual-input');
+const infoPanel = document.getElementById('info-panel');
+const infoBody = document.getElementById('info-body');
+const auditPanel = document.getElementById('audit-panel');
+const lokasiInput = document.getElementById('lokasi-semakan');
+const catatanInput = document.getElementById('catatan');
+const logList = document.getElementById('log-list');
+const toastEl = document.getElementById('toast');
+const webhookInput = document.getElementById('webhook-url');
+const connPill = document.getElementById('conn-pill');
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=> toastEl.classList.remove('show'), 2200);
+}
+
+const hasCloudStorage = (typeof window.storage !== 'undefined');
+
+async function storageGet(key){
+  if(hasCloudStorage){
+    try{ return await window.storage.get(key, false); }catch(e){ return null; }
+  }
+  try{
+    const v = localStorage.getItem(key);
+    return v !== null ? { value: v } : null;
+  }catch(e){ return null; }
+}
+
+async function storageSet(key, value){
+  if(hasCloudStorage){
+    return await window.storage.set(key, value, false);
+  }
+  localStorage.setItem(key, value);
+  return { value };
+}
+
+async function loadLocations(){
+  if(!webhookUrl) return;
+  try{
+    const res = await fetch(webhookUrl + '?action=locations');
+    const data = await res.json();
+    if(data.locations && Array.isArray(data.locations)){
+      const list = document.getElementById('lokasi-list');
+      list.innerHTML = data.locations.map(loc => `<option value="${escapeHTML(loc)}">`).join('');
+    }
+  }catch(e){ /* location list is optional, fail silently */ }
+}
+
+async function loadWebhook(){
+  try{
+    const res = await storageGet('settings:webhookUrl');
+    if(res && res.value){
+      webhookUrl = res.value;
+      webhookInput.value = webhookUrl;
+      connPill.textContent = 'Disambungkan';
+      connPill.classList.add('ok');
+      camStatus.textContent = 'Tekan "Mula kamera" untuk scan barkod.';
+      loadLocations();
+    }
+  }catch(e){ /* not set yet */ }
+}
+
+document.getElementById('webhook-save').onclick = async () => {
+  const url = webhookInput.value.trim();
+  if(!url){ showToast('Paste URL Apps Script dahulu'); return; }
+  try{
+    await storageSet('settings:webhookUrl', url);
+    webhookUrl = url;
+    connPill.textContent = 'Disambungkan';
+    connPill.classList.add('ok');
+    camStatus.textContent = 'Tekan "Mula kamera" untuk scan barkod.';
+    showToast('Google Sheet disambungkan');
+    loadLocations();
+  }catch(e){
+    showToast('Gagal simpan URL — cuba lagi');
+  }
+};
+
+async function lookupAsset(barcode){
+  if(!webhookUrl){ showToast('Sambungkan Google Sheet dahulu'); return; }
+  showToast('Mencari barkod ' + barcode + '...');
+  try{
+    const res = await fetch(webhookUrl + '?barcode=' + encodeURIComponent(barcode));
+    const data = await res.json();
+    if(data.found){
+      currentAsset = {
+        barkod: barcode,
+        namaAsset: data.namaAsset || '',
+        namaPemilik: data.namaPemilik || '',
+        jabatan: data.jabatan || ''
+      };
+      renderInfo(true);
+      auditPanel.style.display = 'block';
+      auditPanel.scrollIntoView({behavior:'smooth', block:'center'});
+    } else {
+      currentAsset = null;
+      renderInfo(false, barcode);
+      auditPanel.style.display = 'none';
+    }
+  }catch(e){
+    showToast('Gagal hubungi Google Sheet — cuba lagi');
+  }
+}
+
+function renderInfo(found, barcode){
+  infoPanel.style.display = 'block';
+  if(!found){
+    infoBody.innerHTML = `<div class="not-found">Barkod "${escapeHTML(barcode)}" tiada dalam ASSET_MASTER.</div>`;
+    return;
+  }
+  infoBody.innerHTML = `
+    <div class="info-row"><span class="k">Barkod</span><span class="v mono">${escapeHTML(currentAsset.barkod)}</span></div>
+    <div class="info-row"><span class="k">Nama Aset</span><span class="v">${escapeHTML(currentAsset.namaAsset)}</span></div>
+    <div class="info-row"><span class="k">Nama Pemilik</span><span class="v">${escapeHTML(currentAsset.namaPemilik)}</span></div>
+    <div class="info-row"><span class="k">Jabatan</span><span class="v">${escapeHTML(currentAsset.jabatan)}</span></div>
+  `;
+}
+
+function escapeHTML(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : str;
+  return d.innerHTML;
+}
+
+document.getElementById('status-baik').onclick = () => {
+  selectedStatus = 'BAIK';
+  document.getElementById('status-baik').classList.add('sel-baik');
+  document.getElementById('status-rosak').classList.remove('sel-rosak');
+};
+document.getElementById('status-rosak').onclick = () => {
+  selectedStatus = 'ROSAK';
+  document.getElementById('status-rosak').classList.add('sel-rosak');
+  document.getElementById('status-baik').classList.remove('sel-baik');
+};
+
+function resetAuditForm(){
+  selectedStatus = null;
+  lokasiInput.value = '';
+  catatanInput.value = '';
+  document.getElementById('status-baik').classList.remove('sel-baik');
+  document.getElementById('status-rosak').classList.remove('sel-rosak');
+}
+
+document.getElementById('cancel-audit').onclick = () => {
+  auditPanel.style.display = 'none';
+  infoPanel.style.display = 'none';
+  resetAuditForm();
+};
+
+document.getElementById('submit-audit').onclick = async () => {
+  if(!currentAsset){ showToast('Tiada aset dipilih'); return; }
+  if(!selectedStatus){ showToast('Pilih status semakan (BAIK/ROSAK)'); return; }
+  const lokasi = lokasiInput.value.trim();
+  if(!lokasi){ showToast('Isi lokasi semakan'); lokasiInput.focus(); return; }
+
+  const payload = {
+    barkod: currentAsset.barkod,
+    namaAsset: currentAsset.namaAsset,
+    namaPemilik: currentAsset.namaPemilik,
+    jabatan: currentAsset.jabatan,
+    statusSemakan: selectedStatus,
+    lokasiSemakan: lokasi,
+    catatan: catatanInput.value.trim()
+  };
+
+  try{
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    showToast('Semakan dihantar untuk ' + currentAsset.namaAsset);
+    addToLog(payload);
+    auditPanel.style.display = 'none';
+    infoPanel.style.display = 'none';
+    resetAuditForm();
+    currentAsset = null;
+  }catch(e){
+    showToast('Gagal hantar — cuba lagi');
+  }
+};
+
+function addToLog(payload){
+  sessionLog.unshift({ ...payload, time: new Date() });
+  renderLog();
+}
+
+function renderLog(){
+  if(sessionLog.length === 0){
+    logList.innerHTML = `<div class="empty-state"><div class="mono">TIADA REKOD LAGI</div><p>Semakan yang dihantar akan disenaraikan di sini.</p></div>`;
+    return;
+  }
+  logList.innerHTML = sessionLog.map(entry => `
+    <div class="log-item">
+      <span class="log-badge ${entry.statusSemakan === 'BAIK' ? 'baik' : 'rosak'}">${entry.statusSemakan}</span>
+      <div class="log-info">
+        <div class="log-name">${escapeHTML(entry.namaAsset)}</div>
+        <div class="log-meta">${escapeHTML(entry.barkod)} · ${escapeHTML(entry.lokasiSemakan)} · ${entry.time.toLocaleTimeString()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('manual-lookup').onclick = () => {
+  const code = manualInput.value.trim();
+  if(!code){ showToast('Taip nombor barkod dahulu'); return; }
+  manualInput.value = '';
+  lookupAsset(code);
+};
+manualInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('manual-lookup').click();
+});
+
+async function startCamera(){
+  if(!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
+    camStatus.textContent = 'Kamera perlu HTTPS (bukan fail dibuka terus). Guna kemasukan manual, atau host fail ni di laman HTTPS.';
+    camStatus.style.display = 'block';
+    return;
+  }
+  if(!webhookUrl){ showToast('Petua: sambungkan Google Sheet dahulu supaya carian barkod berfungsi'); }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    await video.play();
+    camStatus.style.display = 'none';
+    scanFrame.style.display = 'block';
+    scanLine.style.display = 'block';
+    camToggle.textContent = 'Henti kamera';
+
+    const track = stream.getVideoTracks()[0];
+    const debugEl = document.getElementById('cam-debug');
+    setTimeout(() => {
+      if(track){
+        const s = track.getSettings ? track.getSettings() : {};
+        debugEl.textContent = 'Track: ' + (track.label || 'tiada label') +
+          ' · readyState=' + track.readyState +
+          ' · muted=' + track.muted +
+          ' · ' + (s.width || '?') + 'x' + (s.height || '?') +
+          ' · videoEl=' + video.videoWidth + 'x' + video.videoHeight;
+        if(video.videoWidth === 0){
+          debugEl.classList.add('err');
+          debugEl.textContent += ' — TIADA FRAME VIDEO SAMPAI (kemungkinan besar in-app browser/WebView menyekat kamera sebenar).';
+        }
+      } else {
+        debugEl.textContent = 'Tiada video track dikesan dalam stream.';
+        debugEl.classList.add('err');
+      }
+    }, 1200);
+
+    if('BarcodeDetector' in window){
+      detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','itf'] });
+      scanInterval = setInterval(scanTick, 350);
+    } else {
+      camStatus.textContent = 'Pengesanan barkod langsung tiada pada pelayar ini. Guna kemasukan manual.';
+      camStatus.style.display = 'block';
+    }
+  }catch(e){
+    camStatus.textContent = 'Ralat kamera (' + (e.name || 'unknown') + '). Semak kebenaran kamera untuk laman ini dalam tetapan Chrome, atau guna kemasukan manual.';
+    camStatus.style.display = 'block';
+  }
+}
+
+async function scanTick(){
+  if(!detector || !video.videoWidth) return;
+  try{
+    const codes = await detector.detect(video);
+    if(codes && codes.length > 0){
+      const value = codes[0].rawValue;
+      if(value){
+        stopCamera();
+        lookupAsset(value);
+      }
+    }
+  }catch(e){ /* keep trying */ }
+}
+
+function stopCamera(){
+  if(scanInterval){ clearInterval(scanInterval); scanInterval = null; }
+  if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  scanFrame.style.display = 'none';
+  scanLine.style.display = 'none';
+  camStatus.style.display = 'block';
+  camStatus.textContent = 'Tekan "Mula kamera" untuk scan barkod.';
+  camToggle.textContent = 'Mula kamera';
+  const debugEl = document.getElementById('cam-debug');
+  debugEl.textContent = '';
+  debugEl.classList.remove('err','warn');
+}
+
+camToggle.onclick = () => {
+  if(stream){ stopCamera(); } else { startCamera(); }
+};
+
+loadWebhook();
+</script>
+</body>
+</html>
